@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sorting Visualizer</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Navbar -->
+    <nav id="navbar">
+        <div class="nav-left">
+            <h2 >Sorting Visualizer</h2>
+        </div>
+        <div class="nav-right">
+           
+            <div class="dropdown">
+                <a href="#" class="nav-link">Pseudocode</a>
+                <div class="dropdown-content">
+                    <a href="#" onclick="showPseudocode('bubble')">Bubble Sort</a>
+                    <a href="#" onclick="showPseudocode('selection')">Selection Sort</a>
+                    <a href="#" onclick="showPseudocode('insertion')">Insertion Sort</a>
+                    <a href="#" onclick="showPseudocode('merge')">Merge Sort</a>
+                    <a href="#" onclick="showPseudocode('quick')">Quick Sort</a>
+                </div>
+            </div>
+            
+            <div class="dropdown">
+                <a href="#" class="nav-link">Algorithm</a>
+                <div class="dropdown-content">
+                    <a href="#" onclick="showAlgorithm('bubble')">Bubble Sort</a>
+                    <a href="#" onclick="showAlgorithm('selection')">Selection Sort</a>
+                    <a href="#" onclick="showAlgorithm('insertion')">Insertion Sort</a>
+                    <a href="#" onclick="showAlgorithm('merge')">Merge Sort</a>
+                    <a href="#" onclick="showAlgorithm('quick')">Quick Sort</a>
+                </div>
+            </div>
+            <button id="theme-toggle" onclick="toggleTheme()" class="nav-link"><span id="theme-icon">🌞</span></button>
+
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div id="content">
+      
+        <div id="array-container"></div>
+        <div class="button">
+            <button onclick="generateArray()">Generate New Array</button>
+            <button onclick="bubbleSort()">Bubble Sort</button>
+            <button onclick="selectionSort()">Selection Sort</button>
+            <button onclick="insertionSort()">Insertion Sort</button>
+            <button onclick="mergeSortWrapper()">Merge Sort</button>
+            <button onclick="quickSortWrapper()">Quick Sort</button>
+            <button onclick="resetArray()">Reset Array</button>
+        </div>
+    </div>
+
+    <!-- Placeholder for displaying pseudocode and algorithms -->
+    <div id="display-area"></div>
+
+    <script src="script.js"></script>
+</body>
+</html>

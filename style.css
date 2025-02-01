@@ -1,0 +1,168 @@
+/* Light Theme (Default) */
+:root {
+    --bg-color: #f0f0f0;
+    --text-color: white;
+    --bar-color: #3498db;
+    --active-bar-color: red;
+    --sorted-bar-color: yellow;
+    --navbar-bg: black;
+    --button-bg: black;
+    --button-hover-bg: #2980b9;
+    --display-area-bg: black;
+    --display-area-text-color: white;
+}
+
+/* Dark Theme */
+.dark-theme {
+    --bg-color: #333;
+    --text-color: white;
+    --bar-color: #4CAF50;
+    --active-bar-color: #ff6b6b;
+    --sorted-bar-color: #82e672;
+    --navbar-bg: #222;
+    --button-bg: #444;
+    --button-hover-bg: #555;
+    --display-area-bg: #444;
+    --display-area-text-color: #f9f9f9;
+}
+
+/* Apply theme variables */
+body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--bg-color);
+    color: var(--text-color);
+}
+
+#array-container {
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 6px;
+    margin: 20px auto;
+    width: 90%;
+    height: 350px;
+    background-color: var(--navbar-bg);
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 10px;
+}
+
+.bar {
+    width: 25px;
+    background-color: var(--bar-color);
+    border-radius: 3px 3px 0 0;
+    transition: background-color 0.3s ease, height 0.5s ease;
+}
+
+.bar.active {
+    background-color: var(--active-bar-color);
+}
+
+.bar.sorted {
+    background-color: var(--sorted-bar-color);
+}
+
+button {
+    background-color: var(--button-bg);
+    color: white;
+    border: none;
+    padding: 10px 15px;
+    margin: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    border-radius: 5px;
+    transition: background-color 0.3s ease;
+}
+.button{
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+button:hover {
+    background-color: var(--button-hover-bg);
+}
+
+#controls {
+    text-align: center;
+    margin: 10px;
+}
+
+#navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: var(--navbar-bg);
+    padding: 15px 20px;
+    color: var(--text-color);
+    font-family: Arial, sans-serif;
+    margin: 0;
+}
+
+.nav-left h2 {
+    margin: 0;
+    font-size: 30px;
+    font-weight: 800;
+}
+
+.nav-right {
+    display: flex;
+    align-items: center;
+}
+
+.nav-link {
+    color: var(--text-color);
+    text-decoration: none;
+    margin-right: 20px;
+    font-size: 20px;
+    font-weight: 600;
+    cursor: pointer;
+    position: relative;
+}
+
+.nav-link:hover {
+    color: #f0f0f0;
+}
+#theme-toggle:active{
+    transform: rotate(180deg);
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    background-color: var(--bar-color);
+    box-shadow: 0px 8px 16px rgba(0, 0, 0, 0.2);
+    min-width: 160px;
+    border-radius: 4px;
+    z-index: 1;
+}
+
+.dropdown-content a {
+    color: white;
+    padding: 10px 15px;
+    text-decoration: none;
+    display: block;
+    font-size: 16px;
+}
+
+.dropdown-content a:hover {
+    background-color: var(--button-bg);
+}
+
+.dropdown:hover .dropdown-content {
+    display: block;
+}
+
+#display-area {
+    display: flex;
+   flex-direction: column;
+    margin: 20px;
+    padding: 20px;
+    background-color: var(--display-area-bg);
+    color: var(--display-area-text-color);
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 16px;
+}
