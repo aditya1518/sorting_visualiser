@@ -1,133 +1,344 @@
 let array = [];
-let originalArray = [];  // Store the original array
+let originalArray = [];
+let isSorting = false;
+let stopRequested = false;
 
-function generateArray() {
-    array = [];
+function getBarScale() {
     const container = document.getElementById("array-container");
-    container.innerHTML = ''; // Clear existing bars
+    if (!container || array.length === 0) return 1;
 
-    // Generate bars
-    for (let i = 0; i < 30; i++) {
-        const height = Math.floor(Math.random() * 100) + 10;
-        array.push(height);
-        const bar = document.createElement("div");
-        bar.style.height = `${height * 3}px`;
-        bar.classList.add("bar");
-        container.appendChild(bar);
+    const maxVal = Math.max(...array);
+    if (!maxVal) return 1;
+
+    const availableHeight = container.clientHeight - 20; // 
+    return availableHeight / maxVal;
+}
+
+
+function setCustomArray() {
+    if (isSorting) {
+        setStatus("Wait: sorting is running. Stop it first or let it finish.");
+        return;
     }
 
-    // Store the original array
-    originalArray = [...array];  // Copy current array for resetting
+    const inputEl = document.getElementById("array-input");
+    if (!inputEl) return;
+
+    const raw = inputEl.value.trim();
+    if (!raw) {
+        setStatus("Please enter some numbers.");
+        return;
+    }
+
+    const parts = raw.split(/[,\s]+/);
+    const nums = [];
+
+    for (const p of parts) {
+        if (!p) continue;
+        const n = Number(p);
+        if (Number.isNaN(n)) {
+            setStatus(`Invalid value: "${p}" is not a number.`);
+            return;
+        }
+        nums.push(n);
+    }
+
+    if (nums.length === 0) {
+        setStatus("No valid numbers found.");
+        return;
+    }
+
+    if (nums.length > 20) {
+        setStatus("Maximum 20 elements allowed.");
+        return;
+    }
+
+    array = nums;
+    originalArray = [...array];
+
+    updateDisplay();
+    clearBarClasses();
+    setStatus("Custom array set. Now choose a sorting algorithm.");
 }
 
-// Delay function for visualization
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+
+function stopSorting() {
+    stopRequested = true;
+    setStatus("Sorting stopped.");
 }
+
+
+function generateArray() {
+    if (isSorting) return;
+
+    array = [];
+    const container = document.getElementById("array-container");
+    container.innerHTML = "";
+
+    for (let i = 0; i < 20; i++) {
+        const value = Math.floor(Math.random() * 100) + 10;
+        array.push(value);
+    }
+
+    originalArray = [...array];
+
+    updateDisplay();       // ye khud scale ke saath bars banayega
+    setStatus("New array generated.");
+}
+
+
+
+
+function delay(ms) {
+    return new Promise(resolve => {
+        const start = Date.now();
+
+        function check() {
+            if (stopRequested) {
+                return resolve();
+            }
+            const elapsed = Date.now() - start;
+            if (elapsed >= ms) {
+                return resolve();
+            }
+            requestAnimationFrame(check);
+        }
+
+        check();
+    });
+}
+
 
 function refreshBars() {
     return document.getElementsByClassName("bar");
 }
 
 function resetArray() {
-    array = [...originalArray];  // Reset the array to the original state
+    if (isSorting) return;
+
+    array = [...originalArray];
     updateDisplay();
+    clearBarClasses();
+    setStatus("Array reset to original state.");
+}
+
+
+function getBarScale() {
+    const container = document.getElementById("array-container");
+    if (!container || array.length === 0) return 1;
+
+    const maxVal = Math.max(...array);
+    if (!maxVal) return 1;
+
+    const availableHeight = container.clientHeight - 20; // thoda margin
+    return availableHeight / maxVal;
 }
 
 function updateDisplay() {
     const container = document.getElementById("array-container");
-    container.innerHTML = ''; // Clear existing bars
+    container.innerHTML = "";
 
-    // Display the array bars
+    const scale = getBarScale();
+    const minHeight = 20; // ✅ har bar ki minimum height
+
     array.forEach(value => {
+        const wrapper = document.createElement("div");
+        wrapper.classList.add("bar-wrapper");
+
         const bar = document.createElement("div");
-        bar.style.height = `${value * 3}px`;
         bar.classList.add("bar");
-        container.appendChild(bar);
+
+        // normal scaled height
+        let h = value * scale;
+        // ✅ minimum height apply karo
+        if (h < minHeight) h = minHeight;
+
+        bar.style.height = `${h-10}px`;
+
+        const valueLabel = document.createElement("span");
+        valueLabel.classList.add("bar-value");
+        valueLabel.innerText = value;
+
+        bar.appendChild(valueLabel);
+        wrapper.appendChild(bar);
+        container.appendChild(wrapper);
     });
 }
+
+
+
+// Clear active/sorted classes
+function clearBarClasses() {
+    const bars = refreshBars();
+    for (let bar of bars) {
+        bar.classList.remove("active");
+        bar.classList.remove("sorted");
+    }
+}
+
+// Disable/enable all sort buttons EXCEPT stop
+function setControlsDisabled(disabled) {
+    const buttons = document.querySelectorAll(".button-row button");
+    buttons.forEach(btn => {
+        if (btn.id === "stop-button") return; // keep stop clickable
+        btn.disabled = disabled;
+    });
+}
+
+// Status text
+function setStatus(message) {
+    const displayArea = document.getElementById("display-area");
+    if (displayArea) {
+        const current = displayArea.innerText;
+        if (!current || current.startsWith("Status:")) {
+            displayArea.innerText = `Status: ${message}`;
+        }
+    }
+}
+
+// Helper: update single bar's height & text from array[index]
+function updateBarVisual(index) {
+    const bars = refreshBars();
+    const bar = bars[index];
+    if (!bar) return;
+
+    const scale = getBarScale();
+    bar.style.height = `${array[index] * scale}px`;
+
+    const label = bar.querySelector(".bar-value");
+    if (label) label.innerText = array[index];
+}
+
+
+/* ----------------- Sort Runner Wrapper ------------------- */
+
+async function runSort(sortFunction, name) {
+    if (isSorting) return;
+
+    isSorting = true;
+    stopRequested = false; // reset stop flag
+    clearBarClasses();
+    setControlsDisabled(true);
+    setStatus(`${name} is running...`);
+
+    await sortFunction();
+
+    if (!stopRequested) {
+        const bars = refreshBars();
+        for (let bar of bars) bar.classList.add("sorted");
+        setStatus(`${name} completed.`);
+    }
+
+    isSorting = false;
+    setControlsDisabled(false);
+}
+
+/* ----------------- Sorting Algorithms ------------------- */
+
 // Bubble Sort
 async function bubbleSort() {
     const bars = refreshBars();
     for (let i = 0; i < array.length - 1; i++) {
+        if (stopRequested) return;
+
         for (let j = 0; j < array.length - i - 1; j++) {
+            if (stopRequested) return;
+
             bars[j].classList.add("active");
             bars[j + 1].classList.add("active");
 
             if (array[j] > array[j + 1]) {
                 [array[j], array[j + 1]] = [array[j + 1], array[j]];
-                bars[j].style.height = `${array[j] * 3}px`;
-                bars[j + 1].style.height = `${array[j + 1] * 3}px`;
-                await delay(100);
+
+                updateBarVisual(j);
+                updateBarVisual(j + 1);
+
+                await delay(1000);
             }
+
             bars[j].classList.remove("active");
             bars[j + 1].classList.remove("active");
         }
-        bars[array.length - 1 - i].classList.add("sorted"); // Mark as sorted
+        bars[array.length - 1 - i].classList.add("sorted");
     }
-    bars[0].classList.add("sorted"); // Mark the first element as sorted at the end
+    bars[0].classList.add("sorted");
 }
 
 // Selection Sort
 async function selectionSort() {
     const bars = refreshBars();
+
     for (let i = 0; i < array.length; i++) {
+        if (stopRequested) return;
+
         let minIndex = i;
         bars[i].classList.add("active");
 
         for (let j = i + 1; j < array.length; j++) {
+            if (stopRequested) return;
+
             bars[j].classList.add("active");
+            await delay(580);
+
             if (array[j] < array[minIndex]) {
                 minIndex = j;
             }
-            await delay(100);
             bars[j].classList.remove("active");
         }
 
         if (minIndex !== i) {
             [array[i], array[minIndex]] = [array[minIndex], array[i]];
-            bars[i].style.height = `${array[i] * 3}px`;
-            bars[minIndex].style.height = `${array[minIndex] * 3}px`;
+            updateBarVisual(i);
+            updateBarVisual(minIndex);
         }
-        bars[i].classList.add("sorted"); // Mark as sorted
+
         bars[i].classList.remove("active");
+        bars[i].classList.add("sorted");
     }
 }
 
 // Insertion Sort
 async function insertionSort() {
     const bars = refreshBars();
+
     for (let i = 1; i < array.length; i++) {
+        if (stopRequested) return;
+
         let key = array[i];
         let j = i - 1;
 
         bars[i].classList.add("active");
+
         while (j >= 0 && array[j] > key) {
+            if (stopRequested) return;
+
             array[j + 1] = array[j];
-            bars[j + 1].style.height = `${array[j + 1] * 3}px`;
+            updateBarVisual(j + 1);
+
             j--;
-            await delay(100);
+            await delay(520); 
         }
+
         array[j + 1] = key;
-        bars[j + 1].style.height = `${key * 3}px`;
+        updateBarVisual(j + 1);
+
         bars[i].classList.remove("active");
-        bars[i].classList.add("sorted"); // Mark as sorted
+
+        // Mark prefix as sorted
+        for (let k = 0; k <= i; k++) {
+            bars[k].classList.add("sorted");
+        }
     }
-    bars[0].classList.add("sorted"); // Mark the first element as sorted
 }
 
 // Merge Sort Wrapper
 async function mergeSortWrapper() {
     await mergeSort(array, 0, array.length - 1);
-    // Mark all bars as sorted after completion
-    const bars = refreshBars();
-    for (const bar of bars) {
-        bar.classList.add("sorted");
-    }
 }
 
 // Merge Sort
 async function mergeSort(arr, left, right) {
+    if (stopRequested) return;
     if (left < right) {
         const mid = Math.floor((left + right) / 2);
         await mergeSort(arr, left, mid);
@@ -138,108 +349,160 @@ async function mergeSort(arr, left, right) {
 
 // Merge function for Merge Sort
 async function merge(arr, left, mid, right) {
+    if (stopRequested) return;
+
     const bars = refreshBars();
     const leftArray = arr.slice(left, mid + 1);
     const rightArray = arr.slice(mid + 1, right + 1);
 
-    let i = 0, j = 0, k = left;
+    let i = 0,
+        j = 0,
+        k = left;
+
+    // Highlight current merge range
+    for (let idx = left; idx <= right; idx++) {
+        bars[idx].classList.add("active");
+    }
+
     while (i < leftArray.length && j < rightArray.length) {
+        if (stopRequested) break;
+
         if (leftArray[i] <= rightArray[j]) {
             arr[k] = leftArray[i];
-            bars[k].style.height = `${arr[k] * 3}px`;
             i++;
         } else {
             arr[k] = rightArray[j];
-            bars[k].style.height = `${arr[k] * 3}px`;
             j++;
         }
+
+        updateBarVisual(k);
+        await delay(1050);
         k++;
-        await delay(100);
     }
 
-    while (i < leftArray.length) {
+    while (i < leftArray.length && !stopRequested) {
         arr[k] = leftArray[i];
-        bars[k].style.height = `${arr[k] * 3}px`;
+        updateBarVisual(k);
         i++;
         k++;
-        await delay(100);
+        await delay(1050);
     }
 
-    while (j < rightArray.length) {
+    while (j < rightArray.length && !stopRequested) {
         arr[k] = rightArray[j];
-        bars[k].style.height = `${arr[k] * 3}px`;
+        updateBarVisual(k);
         j++;
         k++;
-        await delay(100);
+        await delay(50);
+    }
+
+    // Remove highlight
+    for (let idx = left; idx <= right; idx++) {
+        bars[idx].classList.remove("active");
     }
 }
 
-// Quick Sort Wrapper
+// Quick Sort Wrapper/* ----------------- Quick Sort Wrapper ------------------- */
+
 async function quickSortWrapper() {
     await quickSort(array, 0, array.length - 1);
-    // Mark all bars as sorted after completion
-    const bars = refreshBars();
-    for (const bar of bars) {
-        bar.classList.add("sorted");
-    }
 }
 
-// Quick Sort
+/* ----------------- Quick Sort ------------------- */
+
 async function quickSort(arr, low, high) {
+    if (stopRequested) return;   // stop immediately
+
     if (low < high) {
         const pi = await partition(arr, low, high);
+
+        if (stopRequested) return;
+
         await quickSort(arr, low, pi - 1);
         await quickSort(arr, pi + 1, high);
     }
 }
 
-// Partition function for Quick Sort
+/* ----------------- Partition (Lomuto Scheme) ------------------- */
+
 async function partition(arr, low, high) {
-    const pivot = arr[high];
     const bars = refreshBars();
+    const pivot = arr[high];
     let i = low - 1;
 
+    // Highlight pivot bar
+    bars[high].classList.add("active");
+
     for (let j = low; j < high; j++) {
+
+        if (stopRequested) {
+            bars[j].classList.remove("active");
+            bars[high].classList.remove("active");
+            return i;
+        }
+
         bars[j].classList.add("active");
+        await delay(500);
+
+        if (stopRequested) {
+            bars[j].classList.remove("active");
+            bars[high].classList.remove("active");
+            return i;
+        }
+
+        // Compare with pivot
         if (arr[j] < pivot) {
             i++;
+
+            // swap arr[i] ←→ arr[j]
             [arr[i], arr[j]] = [arr[j], arr[i]];
-            bars[i].style.height = `${arr[i] * 3}px`;
-            bars[j].style.height = `${arr[j] * 3}px`;
-            await delay(100);
+
+            // Update visuals
+            updateBarVisual(i);
+            updateBarVisual(j);
+
+            await delay(500);
         }
+
         bars[j].classList.remove("active");
     }
+
+    if (stopRequested) {
+        bars[high].classList.remove("active");
+        return i;
+    }
+
+    // Final pivot swap to correct position
     [arr[i + 1], arr[high]] = [arr[high], arr[i + 1]];
-    bars[i + 1].style.height = `${arr[i + 1] * 3}px`;
-    bars[high].style.height = `${arr[high] * 3}px`;
+    updateBarVisual(i + 1);
+    updateBarVisual(high);
+    await delay(500);
+
+    // Remove active from pivot
+    bars[high].classList.remove("active");
+
+    // Mark pivot sorted
+    bars[i + 1].classList.add("sorted");
+
     return i + 1;
 }
 
-generateArray();
-// Toggle dark theme
+/* ----------------- Theme Toggle ------------------- */
+
 function toggleTheme() {
     document.body.classList.toggle("dark-theme");
-    
-    // Save the theme preference in localStorage
+    const themeIcon = document.getElementById("theme-icon");
+
     if (document.body.classList.contains("dark-theme")) {
         localStorage.setItem("theme", "dark");
+        themeIcon.textContent = "🌙";
     } else {
         localStorage.setItem("theme", "light");
+        themeIcon.textContent = "🌞";
     }
 }
 
-// Load theme preference on page load
-window.onload = function () {
-    if (localStorage.getItem("theme") === "dark") {
-        document.body.classList.add("dark-theme");
-    }
-};
-
-function showHome() {
-    const displayArea = document.getElementById("display-area");
-    displayArea.innerHTML = "";
-}
+/* ----------------- Pseudocode & Algorithm Display ------------------- */
 
 function showPseudocode(algorithm) {
     const displayArea = document.getElementById("display-area");
@@ -249,45 +512,56 @@ function showPseudocode(algorithm) {
         case "bubble":
             pseudocodeText = `
 Bubble Sort Pseudocode:
-1. Repeat (n-1) times:
-2.  Compare adjacent elements
-3.  Swap if they are in the wrong order
-4. End if no swaps were made
-            `;
+1. Repeat (n - 1) times:
+2.   For each pair of adjacent elements:
+3.       If left > right: swap them
+4.   If no swaps in a pass: array is sorted
+`;
             break;
         case "selection":
             pseudocodeText = `
 Selection Sort Pseudocode:
-1. Repeat (n-1) times:
-2.  Find the minimum element
-3.  Swap it with the first unsorted element
-4. Move to the next element
-            `;
+1. For i from 0 to n - 2:
+2.   Assume minIndex = i
+3.   For j from i + 1 to n - 1:
+4.       If arr[j] < arr[minIndex]:
+5.           minIndex = j
+6.   Swap arr[i] with arr[minIndex]
+`;
             break;
         case "insertion":
             pseudocodeText = `
 Insertion Sort Pseudocode:
-1. Start from the second element
-2. For each element:
-3.  Shift sorted elements to the right
-4. Insert the element in the correct position
-            `;
+1. For i from 1 to n - 1:
+2.   key = arr[i]
+3.   j = i - 1
+4.   While j >= 0 and arr[j] > key:
+5.       arr[j + 1] = arr[j]
+6.       j--
+7.   arr[j + 1] = key
+`;
             break;
         case "merge":
             pseudocodeText = `
 Merge Sort Pseudocode:
-1. Divide the array into halves
-2. Recursively sort each half
-3. Merge the sorted halves together
-            `;
+1. If array has 1 element: return
+2. Split array into left and right halves
+3. Recursively sort left half
+4. Recursively sort right half
+5. Merge the two sorted halves
+`;
             break;
         case "quick":
             pseudocodeText = `
 Quick Sort Pseudocode:
-1. Pick a pivot element
-2. Partition elements around the pivot
-3. Recursively apply quick sort on partitions
-            `;
+1. If array size <= 1: return
+2. Choose a pivot
+3. Partition array into:
+     - elements < pivot
+     - elements >= pivot
+4. Recursively quick sort left part
+5. Recursively quick sort right part
+`;
             break;
     }
 
@@ -301,203 +575,196 @@ function showAlgorithm(algorithm) {
     switch (algorithm) {
         case "bubble":
             algorithmCode = `
-Bubble Sort Algorithm:
+Bubble Sort (Common Implementations)
 
 C++:
-
 void bubbleSort(int arr[], int n) {
-    for (int i = 0; i < n-1; i++)
-        for (int j = 0; j < n-i-1; j++)
-            if (arr[j] > arr[j+1])
-                swap(arr[j], arr[j+1]);
+  for (int i = 0; i < n - 1; i++){
+    for (int j = 0; j < n - i - 1; j++){
+      if (arr[j] > arr[j + 1]){
+        swap(arr[j], arr[j + 1]);
+      }
+    }
+  }
 }
 
 Java:
-
 void bubbleSort(int[] arr) {
-    for (int i = 0; i < arr.length - 1; i++)
-        for (int j = 0; j < arr.length - i - 1; j++)
-            if (arr[j] > arr[j + 1]) {
-                int temp = arr[j];
-                arr[j] = arr[j + 1];
-                arr[j + 1] = temp;
-            }
+  for (int i = 0; i < arr.length - 1; i++)
+    for (int j = 0; j < arr.length - i - 1; j++)
+      if (arr[j] > arr[j + 1]) {
+        int temp = arr[j];
+        arr[j] = arr[j + 1];
+        arr[j + 1] = temp;
+      }
+    }
+  }
 }
 
 Python:
-
 def bubble_sort(arr):
-    for i in range(len(arr) - 1):
-        for j in range(len(arr) - i - 1):
-            if arr[j] > arr[j + 1]:
-                arr[j], arr[j + 1] = arr[j + 1], arr[j]
+  for i in range(len(arr) - 1):
+    for j in range(len(arr) - i - 1):
+      if arr[j] > arr[j + 1]:
+        arr[j], arr[j + 1] = arr[j + 1], arr[j]
 
 JavaScript:
-
 function bubbleSort(arr) {
-    for (let i = 0; i < arr.length - 1; i++) {
-        for (let j = 0; j < arr.length - i - 1; j++) {
-            if (arr[j] > arr[j + 1]) {
-                [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
-            }
-        }
+  for (let i = 0; i < arr.length - 1; i++) {
+    for (let j = 0; j < arr.length - i - 1; j++) {
+      if (arr[j] > arr[j + 1]) {
+        [arr[j], arr[j + 1]] = [arr[j + 1], arr[j]];
+      }
     }
+  }
 }
-            `;
+`;
             break;
+
         case "selection":
             algorithmCode = `
-Selection Sort Algorithm:
+Selection Sort (Common Implementations)
 
 C++:
-
 void selectionSort(int arr[], int n) {
-    for (int i = 0; i < n-1; i++) {
-        int min_idx = i;
-        for (int j = i+1; j < n; j++)
-            if (arr[j] < arr[min_idx])
-                min_idx = j;
-        swap(arr[min_idx], arr[i]);
+  for (int i = 0; i < n - 1; i++) {
+    int min_idx = i;
+    for (int j = i + 1; j < n; j++){
+    if (arr[j] < arr[min_idx]) {
+      min_idx = j;
+      swap(arr[min_idx], arr[i]);
     }
+  }
 }
 
 Java:
-
 void selectionSort(int[] arr) {
-    for (int i = 0; i < arr.length - 1; i++) {
-        int minIdx = i;
-        for (int j = i + 1; j < arr.length; j++) {
-            if (arr[j] < arr[minIdx]) {
-                minIdx = j;
-            }
-        }
-        int temp = arr[minIdx];
-        arr[minIdx] = arr[i];
-        arr[i] = temp;
+  for (int i = 0; i < arr.length - 1; i++) {
+    int minIdx = i;
+    for (int j = i + 1; j < arr.length; j++) {
+      if (arr[j] < arr[minIdx]) {
+        minIdx = j;
+      }
     }
+    int temp = arr[minIdx];
+    arr[minIdx] = arr[i];
+    arr[i] = temp;
+  }
 }
 
 Python:
-
 def selection_sort(arr):
-    for i in range(len(arr) - 1):
-        min_idx = i
-        for j in range(i + 1, len(arr)):
-            if arr[j] < arr[min_idx]:
-                min_idx = j
-        arr[i], arr[min_idx] = arr[min_idx], arr[i]
+  for i in range(len(arr) - 1):
+  min_idx = i
+  for j in range(i + 1, len(arr)):
+    if arr[j] < arr[min_idx]:
+      min_idx = j
+      arr[i], arr[min_idx] = arr[min_idx], arr[i]
 
 JavaScript:
-
 function selectionSort(arr) {
-    for (let i = 0; i < arr.length - 1; i++) {
-        let minIdx = i;
-        for (let j = i + 1; j < arr.length; j++) {
-            if (arr[j] < arr[minIdx]) {
-                minIdx = j;
-            }
-        }
-        [arr[i], arr[minIdx]] = [arr[minIdx], arr[i]];
+  for (let i = 0; i < arr.length - 1; i++) {
+    let minIdx = i;
+    for (let j = i + 1; j < arr.length; j++) {
+      if (arr[j] < arr[minIdx]) {
+        minIdx = j;
+      }
     }
+    [arr[i], arr[minIdx]] = [arr[minIdx], arr[i]];
+  }
 }
-            `;
+`;
             break;
+
         case "insertion":
             algorithmCode = `
-Insertion Sort Algorithm:
+Insertion Sort (Common Implementations)
 
 C++:
-
 void insertionSort(int arr[], int n) {
-    for (int i = 1; i < n; i++) {
-        int key = arr[i];
-        int j = i - 1;
-        while (j >= 0 && arr[j] > key) {
-            arr[j + 1] = arr[j];
-            j = j - 1;
-        }
-        arr[j + 1] = key;
+  for (int i = 1; i < n; i++) {
+    int key = arr[i];
+    int j = i - 1;
+    while (j >= 0 && arr[j] > key) {
+      arr[j + 1] = arr[j];
+      j = j - 1;
     }
+    arr[j + 1] = key;
+  }
 }
 
 Java:
-
 void insertionSort(int[] arr) {
-    for (int i = 1; i < arr.length; i++) {
-        int key = arr[i];
-        int j = i - 1;
-        while (j >= 0 && arr[j] > key) {
-            arr[j + 1] = arr[j];
-            j = j - 1;
-        }
-        arr[j + 1] = key;
+  for (int i = 1; i < arr.length; i++) {
+    int key = arr[i];
+    int j = i - 1;
+    while (j >= 0 && arr[j] > key) {
+      arr[j + 1] = arr[j];
+      j = j - 1;
     }
+    arr[j + 1] = key;
+  }
 }
 
 Python:
-
 def insertion_sort(arr):
-    for i in range(1, len(arr)):
-        key = arr[i]
-        j = i - 1
-        while j >= 0 and arr[j] > key:
-            arr[j + 1] = arr[j]
-            j -= 1
-        arr[j + 1] = key
+  for i in range(1, len(arr)):
+    key = arr[i]
+    j = i - 1
+    while j >= 0 and arr[j] > key:
+      arr[j + 1] = arr[j]
+      j -= 1
+      arr[j + 1] = key
 
 JavaScript:
-
 function insertionSort(arr) {
-    for (let i = 1; i < arr.length; i++) {
-        let key = arr[i];
-        let j = i - 1;
-        while (j >= 0 && arr[j] > key) {
-            arr[j + 1] = arr[j];
-            j = j - 1;
-        }
-        arr[j + 1] = key;
+  for (let i = 1; i < arr.length; i++) {
+    let key = arr[i];
+    let j = i - 1;
+    while (j >= 0 && arr[j] > key) {
+      arr[j + 1] = arr[j];
+      j = j - 1;
     }
+    arr[j + 1] = key;
+  }
 }
-            `;
+`;
             break;
+
         case "merge":
             algorithmCode = `
-Merge Sort Algorithm:
+Merge Sort (Common Implementations)
 
 C++:
-
 void mergeSort(int arr[], int l, int r) {
-    if (l >= r) return;
-    int m = l + (r - l) / 2;
+  if (l >= r) return;
+  int m = l + (r - l) / 2;
+  mergeSort(arr, l, m);
+  mergeSort(arr, m + 1, r);
+  merge(arr, l, m, r);
+}
+
+Java:
+void mergeSort(int[] arr, int l, int r) {
+  if (l < r) {
+    int m = (l + r) / 2;
     mergeSort(arr, l, m);
     mergeSort(arr, m + 1, r);
     merge(arr, l, m, r);
-}
-
-Java:
-
-void mergeSort(int[] arr, int l, int r) {
-    if (l < r) {
-        int m = (l + r) / 2;
-        mergeSort(arr, l, m);
-        mergeSort(arr, m + 1, r);
-        merge(arr, l, m, r);
-    }
+  }
 }
 
 Python:
-
 def merge_sort(arr):
-    if len(arr) > 1:
-        mid = len(arr) // 2
-        L = arr[:mid]
-        R = arr[mid:]
-        merge_sort(L)
-        merge_sort(R)
-        merge(arr, L, R)
+  if len(arr) > 1:
+    mid = len(arr) // 2
+      L = arr[:mid]
+    R = arr[mid:]
+    merge_sort(L)
+    merge_sort(R)
+    merge(arr, L, R)
 
 JavaScript:
-
 function mergeSort(arr) {
     if (arr.length < 2) return arr;
     const mid = Math.floor(arr.length / 2);
@@ -505,58 +772,69 @@ function mergeSort(arr) {
     const right = mergeSort(arr.slice(mid));
     return merge(left, right);
 }
-            `;
+`;
             break;
+
         case "quick":
             algorithmCode = `
-Quick Sort Algorithm:
+Quick Sort (Common Implementations)
 
 C++:
-
 void quickSort(int arr[], int low, int high) {
-    if (low < high) {
-        int pi = partition(arr, low, high);
-        quickSort(arr, low, pi - 1);
-        quickSort(arr, pi + 1, high);
-    }
+  if (low < high) {
+    int pi = partition(arr, low, high);
+    quickSort(arr, low, pi - 1);
+    quickSort(arr, pi + 1, high);
+  }
 }
 
 Java:
-
 void quickSort(int[] arr, int low, int high) {
-    if (low < high) {
-        int pi = partition(arr, low, high);
-        quickSort(arr, low, pi - 1);
-        quickSort(arr, pi + 1, high);
-    }
+  if (low < high) {
+    int pi = partition(arr, low, high);
+    quickSort(arr, low, pi - 1);
+    quickSort(arr, pi + 1, high);
+  }
 }
 
 Python:
-
 def quick_sort(arr):
-    if len(arr) <= 1:
-        return arr
-    pivot = arr[len(arr) // 2]
-    left = [x for x in arr if x < pivot]
-    middle = [x for x in arr if x == pivot]
-    right = [x for x in arr if x > pivot]
-    return quick_sort(left) + middle + quick_sort(right)
+  if len(arr) <= 1:
+    return arr
+  pivot = arr[len(arr) // 2]
+  left = [x for x in arr if x < pivot]
+  middle = [x for x in arr if x == pivot]
+  right = [x for x in arr if x > pivot]
+  return quick_sort(left) + middle + right
 
 JavaScript:
-
 function quickSort(arr) {
-    if (arr.length < 2) return arr;
-    const pivot = arr[arr.length - 1];
-    const left = [];
-    const right = [];
-    for (const el of arr.slice(0, arr.length - 1)) {
-        el < pivot ? left.push(el) : right.push(el);
-    }
-    return [...quickSort(left), pivot, ...quickSort(right)];
+  if (arr.length < 2) return arr;
+  const pivot = arr[arr.length - 1];
+  const left = [];
+  const right = [];
+  for (const el of arr.slice(0, arr.length - 1)) {
+    el < pivot ? left.push(el) : right.push(el);
+  }
+  return [...quickSort(left), pivot, ...quickSort(right)];
 }
-            `;
+
+`;
             break;
     }
 
     displayArea.innerText = algorithmCode;
 }
+
+/* ----------------- On Page Load ------------------- */
+
+window.onload = function () {
+    // Restore theme
+    if (localStorage.getItem("theme") === "dark") {
+        document.body.classList.add("dark-theme");
+        const themeIcon = document.getElementById("theme-icon");
+        if (themeIcon) themeIcon.textContent = "🌙";
+    }
+
+    generateArray();
+};
